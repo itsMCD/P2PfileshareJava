@@ -1,5 +1,7 @@
 # Compiled class file
 *.class
+!in.txt
+*.txt
 
 # Log file
 *.log
