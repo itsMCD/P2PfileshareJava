@@ -9,17 +9,18 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.Arrays;
 
 public class Server implements Runnable {
   
   public static final int PORT = 6969;
-  public static final int PACKAGESIZE = 16;
+  public static final int PACKAGESIZE = 256;
 
   public boolean initFlag = false;
   private DatagramSocket socket;
   private File file;
   private FileOutputStream out;
-  private byte[] buffer = new byte[PACKAGESIZE+1];//this needs to match up with with sender
+  private byte[] buffer = new byte[PACKAGESIZE+3];//this needs to match up with with sender
   public boolean eotFlag = false;
   public Server() {
     try {
@@ -29,7 +30,7 @@ public class Server implements Runnable {
     } catch (UnknownHostException e) {
       
     }
-    // file = new File("output.jpg"); //XXX
+    //file = new File("output.png"); //XXX
     file = new File("out.txt");
     try {
       out = new FileOutputStream(file);
@@ -53,20 +54,22 @@ public class Server implements Runnable {
   }
 
   private void writeToFile(byte[] bytes) {
-    byte[] data = new byte[bytes.length-1];
-    for (int i = 0; i < data.length; i++) {
-      //if (bytes[i+1] != 0)
-        data[i] =bytes[i+1];
+    byte[] data = new byte[bytes.length-3];
+    short a = (short) ((bytes[1] << 8) | (bytes[2] & 0xff));
+    //System.out.println(a + " ~~~~~~~~~~~~~~~~~");
+
+    data = Arrays.copyOfRange(bytes, 3, a+3);
+      try {
+        out.write(data);
+      } catch (IOException e) {
+        
+      }
+      if (a < PACKAGESIZE) {
+        eotFlag = true;
+      }
     }
-    try {
-      out.write(data[1]);
-    } catch (IOException e) {
-      
-    }
-    if (bytes[bytes.length-1] == 0) {
-      eotFlag = true;
-    }
-  }
+    
+  
 
   @Override
   public void run() {

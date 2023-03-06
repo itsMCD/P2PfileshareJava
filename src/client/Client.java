@@ -12,6 +12,7 @@ import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.LinkedList;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -22,13 +23,14 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class Client implements Runnable {
   public static final boolean DEBUG = true;
-  public static final int PACKAGESIZE = 16;
+  public static final int PACKAGESIZE = 256;
   public static final int PORT = 6968;
 
   private ConcurrentLinkedQueue<DatagramPacket> buffer = new ConcurrentLinkedQueue<DatagramPacket>();
   private LinkedList<DatagramPacket> sentPackets = new LinkedList<DatagramPacket>();
   DatagramSocket socket;
   public boolean initFlag = false;
+  public boolean EOT = false;
 
   public Client(String file) {
     if (DEBUG)
@@ -66,6 +68,7 @@ public class Client implements Runnable {
   public void addToQueue(DatagramPacket packet) {
     if (DEBUG)
       System.out.println(Thread.currentThread().getName() + "| added to queue");
+    
     buffer.add(packet);
   }
 
@@ -73,7 +76,7 @@ public class Client implements Runnable {
   public void run() {
     if (DEBUG)
       System.out.println(Thread.currentThread().getName() + "| Run method of client started");
-    while (true) {
+    while (!buffer.isEmpty() || !EOT) {
       try {
         DatagramPacket temp = buffer.peek();
         if (temp != null) {
@@ -86,11 +89,12 @@ public class Client implements Runnable {
       }
 
     }
+    socket.close();
   }
 
   public static void main(String[] args) throws InterruptedException {
-    //Client cl = new Client("photoIn.jpg", "127.0.0.1");
-    Client cl = new Client("in.txt", "127.0.0.1");
+    Client cl = new Client("test1.png", "127.0.0.1");
+    //Client cl = new Client("in.txt", "127.0.0.1");
     while (!cl.initFlag) {
       Thread.sleep(50);
     }
@@ -116,6 +120,7 @@ class fileReader implements Runnable {
   public fileReader(String filePath, Client parent) {
     this.parent = parent;
     this.filename = filePath;
+    this.getTextFile();
     if (DEBUG)
       System.out.println(Thread.currentThread().getName() + "\t| Filereader init");
     File file = new File(filePath);
@@ -134,7 +139,8 @@ class fileReader implements Runnable {
     byte[] out = new byte[Client.PACKAGESIZE];
     try {
       if (loc.get() != -1) {
-        loc.getAndSet(in.read(out));
+        int tmp = in.read(out);
+        loc.getAndSet(tmp);
         return out;
       }
     } catch (IOException e) {
@@ -143,37 +149,59 @@ class fileReader implements Runnable {
     return out;
   }
 
-  private byte[] getBytes(int locatoin) {
-    FileInputStream getPacket;
-    byte[] out = new byte[Client.PACKAGESIZE];
+  private void getTextFile() {
+    FileInputStream getPacket = null;
+    byte[] all = null;
     try {
       getPacket = new FileInputStream(new File(filename));
-      getPacket.skip(locatoin * Client.PACKAGESIZE);
-      getPacket.read(out);
+    } catch (FileNotFoundException e) {
+      
+    }
+    try {
+      all = getPacket.readAllBytes();
     } catch (IOException e) {
-
+      
+    }
+    try {
+      FileOutputStream out = new FileOutputStream(new File("TextOut.txt"));
+      out.write(all);
+      out.close();
+    } catch (IOException e) {
+      
+    }
+      
     }
 
-    return out;
-
-  }
+  
 
   @Override
   public void run() {
+    short prevloc = 0;
     if (DEBUG)
       System.out.println(Thread.currentThread().getName() + "| filereader run init");
     while (loc.get() != -1) {
+      prevloc = (short) loc.get();
       if (counter == 0)
         multiplier++;
       byte[] information = getBytes();
-      byte[] addCounter = new byte[information.length + 1];
+      byte[] addCounter = new byte[information.length + 3];
       addCounter[0] = counter;
+      addCounter[1] = (byte) (((short)loc.get()) >> 8);
+      addCounter[2] = (byte) loc.get();
       counter++;
-      for (int i = 1; i < addCounter.length; i++) {
-        addCounter[i] = information[i - 1];
+      for (int i = 3; i < addCounter.length; i++) {
+        addCounter[i] = information[i - 3];
       }
         parent.addToQueue(new DatagramPacket(addCounter, addCounter.length));
+        System.out.println("filename");
     }
+    parent.EOT = true;
+    // byte[] fin = new byte[Client.PACKAGESIZE+1];
+    // fin[0] = counter;
+    // fin[1] = (byte)prevloc;
+    // parent.addToQueue(new DatagramPacket(fin, fin.length));
+    // parent.EOT = true;
+    // System.out.println("EOT " + counter);
 
   }
 
