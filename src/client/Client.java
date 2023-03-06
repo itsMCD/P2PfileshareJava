@@ -89,6 +89,7 @@ public class Client implements Runnable {
   }
 
   public static void main(String[] args) throws InterruptedException {
+    //Client cl = new Client("photoIn.jpg", "127.0.0.1");
     Client cl = new Client("in.txt", "127.0.0.1");
     while (!cl.initFlag) {
       Thread.sleep(50);

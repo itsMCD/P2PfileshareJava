@@ -29,7 +29,8 @@ public class Server implements Runnable {
     } catch (UnknownHostException e) {
       
     }
-    file = new File("output.txt");
+    // file = new File("output.jpg"); //XXX
+    file = new File("out.txt");
     try {
       out = new FileOutputStream(file);
     } catch (FileNotFoundException e) {
@@ -52,8 +53,13 @@ public class Server implements Runnable {
   }
 
   private void writeToFile(byte[] bytes) {
+    byte[] data = new byte[bytes.length-1];
+    for (int i = 0; i < data.length; i++) {
+      //if (bytes[i+1] != 0)
+        data[i] =bytes[i+1];
+    }
     try {
-      out.write(bytes);
+      out.write(data[1]);
     } catch (IOException e) {
       
     }
